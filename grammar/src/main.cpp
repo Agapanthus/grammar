@@ -1,26 +1,23 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <fstream>
+#include <ios>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
-using std::string, std::vector;
-
-#include <fstream>
-
-#include <ios>
-#include <iostream>
 using std::cout, std::endl, std::wcout;
 using std::make_shared, std::shared_ptr;
+using std::string, std::vector;
 
-#include "filters.hpp"
 //#include "find.hpp"
-#include "punctuation.hpp"
-#include "util.hpp"
-
+#include "filters.hpp"
 #include "grammar.hpp"
 #include "grammarIO.hpp"
 #include "parseWiki.hpp"
+#include "punctuation.hpp"
+#include "util.hpp"
 
 typedef int Finder;
 
@@ -31,6 +28,8 @@ typedef int Finder;
 // Dictionary "zusammenfügen" !
 
 // TODO: Komposita (mit Nuspell?) vor der Grammatikanalyse auftrennen
+
+// TODO: Replace std::string with icu string!
 
 void recursivePrint(Finder &fin, Dictionary &dict,
                     shared_ptr<punctuation::Node> sen) {
@@ -78,69 +77,65 @@ void recursivePrint(Finder &fin, Dictionary &dict,
     }
 }
 
-// Prints plurals for words with predefined plural where the prediction failed
-void testNomPlural(const Dictionary &d2, size_t howMany = 10000) {
+double asPercent(double in) { return (int(in * 1000) / 10.0); }
+
+double runTest(Cases c, bool plural, const Dictionary &d2,
+               size_t howMany = 10000, bool print = true) {
 
     size_t count = 0;
     size_t wrong = 0;
 
     for (Noun noun : d2.nouns) {
-        if (!noun.nominative.plural.empty() &&
-            !noun.nominative.singular.empty()) {
-            if (!noun.nominative.plural[0].empty()) {
-                const string np = noun.np(true);
-                if (!noun.np(np)) {
-                    wrong++;
+        if (noun.prefined(c, plural) &&
+            noun.prefined(Cases::Nominative, false)) {
+            const string res = noun.get(c, plural, d2, true);
+            if (!noun.test(c, plural, d2, res)) {
+                wrong++;
+                if (print) {
                     wcout << wrong << L") " << widen(noun.ns()) << L" "
-                          << widen(noun.nominative.plural[0]) << L" "
-                          << widen(np) << endl;
+                          << widen(noun.get(c, plural, d2)) << L" "
+                          << widen(res) << endl;
+
+                    wcout.clear(); // Dirty hack. When outputting something like
+                                   // ō to wcout, it will go bad. Using this it
+                                   // will recover.
                 }
-                if (++count >= howMany) {
-                    cout << int((wrong / double(howMany)) * 1000) / 10.0
-                         << "% errors" << endl;
-                    break;
-                }
+            }
+            if (++count >= howMany) {
+                if (print)
+                    cout << endl
+                         << asPercent(wrong / double(howMany)) << "% errors ("
+                         << wrong << " of " << count << ")" << endl;
+                return wrong / double(howMany);
             }
         }
     }
+    return 0;
 }
 
-// Prints plurals for words with predefined plural where the prediction failed
-void testNomPluralD(const Dictionary &d2, size_t howMany = 10000) {
-
-    size_t count = 0;
-    size_t wrong = 0;
-
-    for (Noun noun : d2.nouns) {
-        if (!noun.nominative.plural.empty() &&
-            !noun.nominative.singular.empty()) {
-            if (!noun.nominative.plural[0].empty()) {
-                const string np = noun.np(d2, true);
-                if (!noun.np(np)) {
-                    wrong++;
-                    wcout << wrong << L") " << widen(noun.ns()) << L" "
-                          << widen(noun.nominative.plural[0]) << L" "
-                          << widen(np) << endl;
-                }
-                if (++count >= howMany) {
-                    cout << endl
-                         << int((wrong / double(howMany)) * 1000) / 10.0
-                         << "% errors (" << wrong << " of " << count << ")"
-                         << endl;
-                    break;
-                }
-            }
-        }
+void matrixTest(const Dictionary &d2, size_t howMany = 10000) {
+    double values[8];
+    for (size_t i = 0; i < 4; i++) {
+        values[i * 2] = runTest(Cases(i), false, d2, howMany, false);
+        values[i * 2 + 1] = runTest(Cases(i), true, d2, howMany, false);
     }
+    cout << "\tNOM\tGEN\tDAT\tACC\n"
+         << "Sg\t" << asPercent(values[0]) << "%\t" << asPercent(values[2])
+         << "%\t" << asPercent(values[4]) << "%\t" << asPercent(values[6])
+         << "%\n"
+         << "Pl\t" << asPercent(values[1]) << "%\t" << asPercent(values[3])
+         << "%\t" << asPercent(values[5]) << "%\t" << asPercent(values[7])
+         << "%" << endl;
 }
 
 // Prints plurals for words with no predefined plural
-void testNomPlural2(const Dictionary &d2, size_t howMany = 100) {
+void testNPNeg(const Dictionary &d2, size_t howMany = 100) {
     size_t count = 0;
     for (Noun noun : d2.nouns) {
         if (noun.nominative.plural.empty()) {
             wcout << count << L") " << widen(noun.ns()) << L" "
-                  << widen(noun.np(true)) << endl;
+                  << widen(noun.np(d2, true)) << endl;
+            wcout.clear();
             if (++count >= howMany)
                 break;
         }
@@ -153,14 +148,46 @@ void testBreakKompositum(const Dictionary &d2, size_t howMany = 100) {
     for (Noun noun : d2.nouns) {
         if (noun.ns().size() > 10) {
             const vector<string> dec = breakKompositum(noun.ns(), d2);
+            wcout << count << L") ";
             for (const string d : dec) {
-                wcout << count << L") " << widen(d) << L" ";
+                wcout << widen(d) << L" ";
+                wcout.clear();
             }
             if (++count >= howMany)
                 break;
             cout << endl;
         }
     }
+}
+
+double testNDeclination(const Dictionary &d2, size_t howMany = 10000,
+                        bool print = true) {
+    size_t count = 0;
+    size_t wrong = 0;
+
+    for (Noun noun : d2.nouns) {
+        if (noun.prefined(Cases::Nominative, false) &&
+            noun.prefined(Cases::Nominative, true)) {
+            // This isn't to precise...
+            if (noun.isNDeclination(false) != noun.isNDeclination(true)) {
+                wrong++;
+                if (print) {
+                    wcout << wrong << L") " << noun.isNDeclination(true)
+                          << L"   " << widen(noun.ns()) << L" "
+                          << widen(noun.np(d2)) << endl;
+                    wcout.clear();
+                }
+            }
+            if (++count >= howMany) {
+                if (print)
+                    cout << endl
+                         << asPercent(wrong / double(howMany)) << "% errors ("
+                         << wrong << " of " << count << ")" << endl;
+                return wrong / double(howMany);
+            }
+        }
+    }
+    return 0;
 }
 
 int main(int argc, char **argv) {
@@ -172,7 +199,9 @@ int main(int argc, char **argv) {
     // TODO: Lower String als Typ einführen um Fehler zu reduzieren!
 
     try {
-        /*
+
+        ///////////////////////// Re-Create DB
+#if 0
         Dictionary dict = parseWiki::parseWiki(
             shared_ptr<istream>(std::make_shared<std::ifstream>(
                 //"dict/test.dict")));
@@ -188,7 +217,9 @@ int main(int argc, char **argv) {
         fo.close();
 
         return 1;
-        */
+#endif
+
+        ///////////////////////// Load DB
 
         std::ifstream fi("dict/db.txt", std::ios::binary);
         LineNumberStreambuf lb(fi);
@@ -207,15 +238,20 @@ int main(int argc, char **argv) {
 
         d2.buildMap();
 
-        wcout << widen(d2.find("Weihnachtsbaum")[0].noun->np(d2, true)) << endl;
-
-        // testNomPlural(d2);
-        testNomPluralD(d2, 2000);
-        // testNomPlural2(d2,300);
+        ///////////////////////////// Tests
+#if 1
+        wcout << widen(d2.find("Weihnachtsbaum")[0].noun->np(d2, true)) << endl
+              << endl;
+        // testNPNeg(d2);
         // testBreakKompositum(d2);
 
-        return 1;
+        matrixTest(d2, 30000);
+        cout << "N-Decl.: " << asPercent(testNDeclination(d2, 30000, false))
+             << "%" << endl;
+#endif
 
+        ///////////////////////////// Match against Alice
+#if 0 
         iStrFil<SkipTo, string> in(
             "Hinunter in den Kaninchenbau.",
             make_shared<iStrFil<RemoveChar, char>>(
@@ -232,11 +268,13 @@ int main(int argc, char **argv) {
             recursivePrint(fin, d2, sen);
             cout << endl;
         }
+#endif
+
         cout << endl << "done" << endl;
         return 0;
 
     } catch (Exception &e) {
-        std::cerr << "Error: " << e.what() << endl;
+        std::cerr << "Error EXCEPTION: " << e.what() << endl;
     } catch (std::exception &e) {
         std::cerr << "Error: std::exception: " << e.what() << endl;
     } catch (...) {

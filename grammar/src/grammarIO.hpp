@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include <ostream>
 using std::ostream;
 
@@ -90,13 +89,13 @@ ostream &operator<<(ostream &out, const Genus &n) {
 }
 
 ostream &operator<<(ostream &out, const Noun &n) {
-    out << n.type << " " << n.genus << "\n   NOM: " << n.nominative << "\n";
-    if (!n.genitive.empty())
-        out << "   GEN: " << n.genitive << "\n";
-    if (!n.dative.empty())
-        out << "   DAT: " << n.dative << "\n";
-    if (!n.accusative.empty())
-        out << "   ACC: " << n.accusative << "\n";
+    out << n.type << " " << n.genus << "\n";
+    static const thread_local vector<string> casesStr = {"NOM", "GEN", "DAT",
+                                                         "ACC"};
+    for (size_t i = 0; i < 4; i++)
+        if (!n.cases[i].empty())
+            out << "   " << casesStr[i] << ": " << n.cases[i] << "\n";
+
     return out;
 }
 
@@ -171,7 +170,8 @@ ostream &operator<<(ostream &out, const Word &w) {
 }
 
 ostream &operator<<(ostream &out, const vector<Word> &words) {
-    for(auto w : words) out << w << "\n";
+    for (auto w : words)
+        out << w << "\n";
     return out;
 }
 

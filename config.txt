@@ -33,6 +33,7 @@ define: WIN32 @grammar
 version: -std=c++17 @grammar
 include: C:\boost_1_69_0 @grammar
 
+include: ./third_party/customOperator @grammar
 
 #################################################
 ## Nuspell
@@ -63,9 +64,15 @@ include: C:\boost_1_69_0 @grammar
 #include: ./third_party/icu/source/common @icu
 #include: ./third_party/icu/source/i18n @icu
 
-#nativelibrary: C:\Program Files (x86)\Windows Kits\10\Lib\10.0.17134.0\um\x64\Advapi32.lib
+nativelibrary: C:\Program Files (x86)\Windows Kits\10\Lib\10.0.17134.0\um\x64\Advapi32.lib
 #nativelibrary: .\third_party\icu-59.1-vs2017\lib64\sicudtd.lib
 #nativelibrary: .\third_party\icu-59.1-vs2017\lib64\sicuucd.lib
+
+nativelibrary: .\third_party\icu-59.1-vs2017\lib64\sicudt.lib
+nativelibrary: .\third_party\icu-59.1-vs2017\lib64\sicuuc.lib
+nativelibrary: .\third_party\icu-59.1-vs2017\lib64\sicuin.lib
+nativelibrary: .\third_party\icu-59.1-vs2017\lib64\sicuio.lib
+nativelibrary: .\third_party\icu-59.1-vs2017\lib64\sicutu.lib
 
 ##nativelibrary: .\third_party\icu-59.1-vs2017\lib64\sicuind.lib
 ##nativelibrary: .\third_party\icu-59.1-vs2017\lib64\sicuiod.lib
@@ -73,6 +80,9 @@ include: C:\boost_1_69_0 @grammar
 
 #define: U_STATIC_IMPLEMENTATION @Nuspell
 #include: ./third_party/icu-59.1-vs2017/include @Nuspell
+
+define: U_STATIC_IMPLEMENTATION @grammar
+include: ./third_party/icu-59.1-vs2017/include @grammar
 
 #################################################
 ## Boost

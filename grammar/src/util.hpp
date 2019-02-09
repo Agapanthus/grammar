@@ -1,19 +1,22 @@
 #pragma once
 
+#include <algorithm>
+#include <cctype>
+#include <iostream>
+#include <ostream>
 #include <string>
-using std::string, std::wstring;
-
 #include <vector>
+using std::ostream, std::wostream;
+using std::string, std::wstring;
 using std::vector;
 
-#include <cctype>
-
-#include <algorithm>
-
-#include <ostream>
-using std::ostream, std::wostream;
-
 #include "utf8.h"
+
+#include <unicode/locid.h>
+#include <unicode/unistr.h>
+#include <unicode/ustream.h>
+
+//#include <customOperator.h>
 
 std::wstring widen(string s) {
     try {
@@ -23,7 +26,19 @@ std::wstring widen(string s) {
     } catch (...) {
         cout << endl << "Error widen: " << s << endl;
     }
+
     return L"";
+}
+
+void fixUTF8(std::string &str) {
+    try {
+        str += " "; // To avoid not_enough_room
+        std::string temp;
+        utf8::replace_invalid(str.begin(), str.end(), back_inserter(temp));
+        str = temp;
+    } catch (... /*utf8::not_enough_room &e*/) {
+        cout << endl << "Error sani: " << endl << str << endl;
+    }
 }
 
 namespace TColors {
@@ -170,15 +185,6 @@ static inline string trim(const string &s) {
     return s2;
 }
 
-template <char delimiter> class WordDelimitedBy : public std::string {};
-
-template <char del> vector<string> split(const string &str) {
-    std::istringstream iss(str);
-    return std::vector<std::string>(
-        std::istream_iterator<WordDelimitedBy<del>>{iss},
-        std::istream_iterator<WordDelimitedBy<del>>());
-}
-
 template <typename K, typename T, typename F>
 vector<K> vecMap(const vector<T> &vec, F f) {
     vector<K> out;
@@ -269,7 +275,8 @@ inline size_t countInOrder(const string &who, const vector<string> &infix) {
             if (inf.size() <= who.size() - i) {
                 if (who.substr(i, inf.size()) == inf) {
                     c++;
-                    i += inf.size();
+                    i += inf.size() -
+                         1; // The one is incremented in the loop header
                     break;
                 }
             }
@@ -286,8 +293,12 @@ class LOCALE {
 };
 const thread_local LOCALE _LOCALE;
 
-string toLower(string s) {
-    for (size_t i = 0; i < s.size(); i++)
-        s[i] = std::tolower(s[i]);
-    return s;
+string toLower(const string &s) {
+    // for (size_t i = 0; i < s.size(); i++) s[i] = std::tolower(s[i]);
+    // std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+
+    icu::UnicodeString str(s.c_str(), "UTF-8");
+    string target;
+    str.toLower("de_DE").toUTF8String(target);
+    return target;
 }

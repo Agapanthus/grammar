@@ -1,36 +1,60 @@
 #pragma once
 
-#include <istream>
-using std::istream;
-
-#include <ostream>
-using std::ostream;
-
-#include <iostream>
-using std::cout, std::cin, std::endl;
-
-#include <string>
-using std::string;
-
 #include <algorithm>
-
+#include <iostream>
+#include <istream>
 #include <memory>
-using std::shared_ptr, std::make_shared;
-
+#include <ostream>
 #include <regex>
-
-#include <vector>
-using std::vector;
-
+#include <sstream>
+#include <string>
 #include <tuple>
+#include <vector>
+using std::cout, std::cin, std::endl;
+using std::istream, std::ostream;
+using std::shared_ptr, std::make_shared;
+using std::string;
 using std::tuple, std::get;
+using std::vector;
 
 #include "grammar.hpp"
 #include "util.hpp"
 
-#include <sstream>
-
 namespace parseWiki {
+
+// If the string looks like something empty, delete it
+string saniWiki(const string &cstr) {
+    string str;
+    str.reserve(cstr.size());
+    for (size_t i = 0; i < cstr.size(); i++) {
+        if (cstr[i] == '&') {
+            // Ampersand will usually start some HTML-Comment but if it
+            // is the &-HTML-Entity, keep it and proceed
+            if (cstr.size() - i > 5) {
+                if (cstr.substr(i, 5) == "&amp;") {
+                    i += 4;
+                    str.push_back('&');
+                    continue;
+                }
+            }
+            break;
+        }
+        str.push_back(cstr[i]);
+    }
+    str = trim(str);
+    if (str == "-" || str == "0" || str == "—" || str == "?")
+        return "";
+
+    replaceHere(str, "’", "'");
+    str = removeSub(str, "·");
+    fixUTF8(str);
+    trimHere(str);
+
+    if (str.length() > 100)
+        return ""; // invalid
+
+    return str;
+}
 
 string readUntil(shared_ptr<istream> &in, const string &ref) {
     string content = "";
@@ -251,14 +275,6 @@ bool collectStarsNumbers(string &prop, vector<string> &target) {
     return false;
 }
 
-// If the string looks like something empty, delete it
-string saniWiki(const string &cstr) {
-    string str = trim(cstr);
-    if (str == "-" || str == "0" || str == "—")
-        return "";
-    return str;
-}
-
 void collectPersons(string &prop, Person &target) {
     string stars = "";
     for (size_t i = 0; i < 4; i++) {
@@ -275,27 +291,28 @@ void collectPersons(string &prop, Person &target) {
 
 const static thread_local std::regex vertSep(R"(\n\|)");
 void buildNoun(const string &type, const string &mType, const string &body,
-               const string &title, Dictionary &dict) {
+               const string &title, Dictionary &dict,
+               const string &worttrennung) {
     Noun n;
     bool some = false;
     if (has(type, "name") || has(mType, "name") || has(type, "Name") ||
         has(mType, "Name")) {
         n.type = NounType::Name;
-        n.nominative.singular.push_back(title);
+        n.nominative.singular.push_back(saniWiki(title));
         some = true;
     } else if (has(type, "Toponym") || has(mType, "Toponym")) {
         n.type = NounType::Toponym;
-        n.nominative.singular.push_back(title);
+        n.nominative.singular.push_back(saniWiki(title));
         some = true;
     } else if (has(mType, "Numeral")) {
         n.type = NounType::Numeral;
-        n.nominative.singular.push_back(title);
+        n.nominative.singular.push_back(saniWiki(title));
         some = true;
     } else if (has(type, "Substantiv") || has(mType, "Substantiv")) {
         n.type = NounType::Noun;
     } else {
         n.type = NounType::Name;
-        n.nominative.singular.push_back(title);
+        n.nominative.singular.push_back(saniWiki(title));
         some = true;
     }
 
@@ -331,11 +348,15 @@ void buildNoun(const string &type, const string &mType, const string &body,
             n.genus.n = has(prop, "n");
             n.genus.m = has(prop, "m");
             n.genus.f = has(prop, "f");
+        } else if (tryEat(prop, "kein Singular=") ||
+                   has(worttrennung, "{{kSg.}}")) {
+            n.noSingular = true;
+        } else if (tryEat(prop, "kein Plural=") ||
+                   has(worttrennung, "{{kPl.}}")) {
+            n.noPlural = true;
         } else if (tryEat(prop, "Bild") || tryEat(prop, "Artikel=Klammer") ||
                    tryEat(prop, "Kein-ens=") || tryEat(prop, "Kein-s=") ||
-                   tryEat(prop, "kein Singular=") ||
-                   tryEat(prop, "kein Plural=") || tryEat(prop, "Stamm=") ||
-                   tryEat(prop, "kein-s=")) {
+                   tryEat(prop, "Stamm=") || tryEat(prop, "kein-s=")) {
             // drop
         } else {
             cout << "Error: unknown prop subs: " << prop << " (" << mType << ")"
@@ -344,7 +365,13 @@ void buildNoun(const string &type, const string &mType, const string &body,
     }
 
     if (n.nominative.singular.empty() && endsWith(title, "sch")) {
-        n.nominative.singular.push_back(title);
+        n.nominative.singular.push_back(saniWiki(title));
+        some = true;
+    }
+
+    // Is this generally ok?
+    if (!some) {
+        n.nominative.singular.push_back(saniWiki(title));
         some = true;
     }
 
@@ -400,7 +427,7 @@ void parseWord(Dictionary &dict, const string &title, const string &type,
             }
         }
         if (v.base.presentInfinitive.empty())
-            v.base.presentInfinitive.push_back(title);
+            v.base.presentInfinitive.push_back(saniWiki(title));
         if (some)
             dict.add(v);
         else
@@ -528,7 +555,7 @@ void parseWord(Dictionary &dict, const string &title, const string &type,
                 else
                     writeTo = &base->first.plural;
 
-                writeTo->push_back(removeSub(removeSub(trim(s), "·"), "&lt"));
+                writeTo->push_back(saniWiki(s));
                 some = true;
             }
         }
@@ -607,7 +634,7 @@ void parseWord(Dictionary &dict, const string &title, const string &type,
         }
 
         if (!some)
-            a.positive.push_back(title);
+            a.positive.push_back(saniWiki(title));
         dict.add(a);
 
     } else if (has(type, "Substantiv") || has(mType, "Substantiv") ||
@@ -615,7 +642,7 @@ void parseWord(Dictionary &dict, const string &title, const string &type,
                has(type, "Toponym") || has(mType, "Toponym") ||
                has(mType, "Numeral")) {
 
-        buildNoun(type, mType, body, title, dict);
+        buildNoun(type, mType, body, title, dict, worttrennung);
 
     } else if (has(mType, "Erweiterter Infinitiv")) {
         // TODO:Add to existing entries!

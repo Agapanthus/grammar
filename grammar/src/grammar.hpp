@@ -1,19 +1,15 @@
 #pragma once
 
-#include <ostream>
-using std::ostream;
-
-#include <string>
-using std::string, std::to_string;
-
-#include <vector>
-using std::vector;
-
 #include <map>
-using std::map;
-
+#include <ostream>
+#include <string>
 #include <tuple>
+#include <vector>
+using std::map;
+using std::ostream;
 using std::pair;
+using std::string, std::to_string;
+using std::vector;
 
 #include "util.hpp"
 
@@ -43,6 +39,13 @@ const thread_local vector<string> vocals = {"a", "e", "i", "o",
                                             "u", "ö", "ä", "ü"};
 const thread_local vector<string> vocalsPlus = {
     "au", "ei", "eu", "äu", "a", "e", "i", "o", "u", "ö", "ä", "ü"};
+
+const thread_local vector<string> sibilants = {"s",    "ss", "ß",
+                                               "tsch", "x",  "z"};
+
+const static thread_local vector<string> nDeclSuffix = {
+    "and", "ant", "at",   "end", "et", "ent",  "graph", "ist",
+    "ik",  "it",  "loge", "nom", "ot", "soph", "urg"};
 
 //////////////////////////////////////
 
@@ -124,6 +127,7 @@ struct Numeri {
             emplace(dict, s, me);
     }
 };
+
 struct Genus {
     bool m;
     bool n;
@@ -134,12 +138,27 @@ struct Genus {
     bool empty() const { return !(m || f || n); }
 };
 
-struct Noun {
-    Numeri nominative, genitive, dative, accusative;
+enum class Cases { Nominative = 0, Genitive = 1, Dative = 2, Accusative = 3 };
+
+struct Noun { // See http://www.dietz-und-daf.de/GD_DkfA/Gramm-List.htm
+    Numeri cases[4];
+    Numeri &nominative, &genitive, &dative, &accusative;
+
     Genus genus;
     NounType type;
+    bool noPlural, noSingular;
+    Noun()
+        : noPlural(false), noSingular(false),
+          nominative(cases[(size_t)Cases::Nominative]),
+          genitive(cases[(size_t)Cases::Genitive]),
+          dative(cases[(size_t)Cases::Dative]),
+          accusative(cases[(size_t)Cases::Accusative]) {}
+
+    string ns() const;
 
     // Tests if n is a nominative singular
+    // Warning: This one is a little less robust than the test for the other
+    // cases
     bool ns(string n) const {
         n = toLower(n);
         for (auto s : nominative.singular)
@@ -148,32 +167,32 @@ struct Noun {
         return false;
     }
 
-    string ns() const;
-
-    bool np(string n) const {
+    bool np(const Dictionary &dict, string n) const {
         n = toLower(n);
         for (auto s : nominative.plural)
             if (toLower(s) == n)
                 return true;
         if (nominative.plural.empty())
-            if (n == toLower(np()))
+            if (n == toLower(np(dict)))
                 return true;
         return false;
     }
 
-    // Don't use this if you can have a dictionary (see the overladed method)
-    string np(bool forceArtificial = false) const {
-        if (forceArtificial || nominative.plural.empty()) {
-            string s = ns();
-            return npRules(s);
-        }
+    // Don't use this if you can have a dictionary
+    string npWithoutDict(const bool forceArtificial = false) const {
+        if (noPlural)
+            return "";
+        if (forceArtificial || nominative.plural.empty())
+            return npRules(forceArtificial);
         return nominative.plural[0];
     }
 
     // Better version using the dictionary
     string np(const Dictionary &dict, bool forceArtificial = false) const;
 
-    string npRules(string s) const {
+    string npRules(const bool forceArtificial = false) const {
+        string s = ns();
+
         const bool m = genus.empty() || genus.m;
         const bool f = genus.empty() || genus.f;
         const bool n = genus.empty() || genus.n;
@@ -226,6 +245,8 @@ struct Noun {
             endsWithAny(s, {"al", "är", "an", "an", "ar", "ell", "eur", "iv",
                             "il", "ling", "nis", "onym",
                             "sal"})) { // nicht: Kanal, Doktor, Atelier, Schal
+            if (tryEatB(s, "nis"))
+                return s + "nisse";
             return s + "e";
         }
 
@@ -293,6 +314,10 @@ struct Noun {
 
         if ((m || n) &&
             endsWithAny(s, {"el", "er", "en"})) { // 90% TODO: unbetont
+            /*if (countInOrder(toLower(s), vocalsPlus) <=
+                2) { // one syllable without the ending
+                return umlautify(s);
+            }*/
             return s;
         } else if (f &&
                    endsWithAny(
@@ -314,8 +339,7 @@ struct Noun {
         ///////////////////////////////////// Basic Rules
 
         if (m) { // 90% (nicht: Mensch...)
-            if (countInOrder(toLower(s), vocalsPlus) <=
-                1) { // one syllable in stem
+            if (countInOrder(toLower(s), vocalsPlus) <= 1) { // one syllable
                 return umlautify(s) + "e";
             } else
                 return s + "e";
@@ -326,21 +350,380 @@ struct Noun {
         }
     }
 
+    string gs(const Dictionary &dict,
+              const bool forceArtificial = false) const {
+        if (noSingular)
+            return "";
+        if (forceArtificial || genitive.singular.empty())
+            return gsRules(forceArtificial);
+        return genitive.singular[0];
+    }
+
+    // TODO: quite vague test
+    bool gs(const Dictionary &dict, string test) const {
+        if (noSingular)
+            return false;
+        test = toLower(test);
+        for (auto g : genitive.singular) {
+            if (toLower(g) == test)
+                return true;
+        }
+        if (genitive.singular.empty()) {
+            const string ns = toLower(this->ns());
+            const bool m = genus.empty() || genus.m;
+            const bool f = genus.empty() || genus.f;
+            const bool n = genus.empty() || genus.n;
+
+            if (isNDeclination()) {
+                if (endsWith(ns, "e"))
+                    return ns + "n" == test;
+                return ns + "en" == test;
+            } else if ((n || m) && endsWithAny(ns, sibilants)) {
+                return ns + "es" == test;
+            } else if (test == toLower(gs(dict))) {
+                return true;
+            } else if (ns == test || ns + "s" == test) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    string gsRules(const bool forceArtificial = false) const {
+        string s = ns();
+
+        const bool m = genus.empty() || genus.m;
+        const bool f = genus.empty() || genus.f;
+        const bool n = genus.empty() || genus.n;
+
+        switch (type) {
+        case NounType::Name:
+            if (endsWithAny(s, sibilants)) {
+                return s + "'"; // or -ens
+                // TODO: Herr -> Herrn, Kollege -> Kollegen
+            } else {
+                return s + "s";
+            }
+            break;
+        case NounType::Toponym:
+            if (f || endsWithAny(s, sibilants)) {
+                if (nullArticle()) {
+                    return "von " + ds();
+                } else {
+                    return s;
+                }
+            } else if (m || n) {
+                return s +
+                       "s"; // -s is optional if there is an adjective attribute
+            }
+            // Fallthrough
+        case NounType::Noun:
+            if (endsWithAny(s, {"ismus", "os"})) {
+                return s;
+            } else if (endsWithAny(s, {"us"}) &&
+                       !endsWithAny(s, {"aus", "eus"})) { // IMHO this is true
+                return s;
+            } else if (m || n) {
+                if (isNDeclination(forceArtificial)) {
+                    tryEatB(s, "e");
+                    return s + "en";
+                } else {
+                    if (endsWithAny(s, vocals) || endsWith(s, "h")) {
+                        return s + "s";
+                    } else if (endsWith(s, "is") &&
+                               !endsWithAny(s, {"eis", "ais"})) {
+                        return s + "ses";
+                    } else if (endsWithAny(s, sibilants)) {
+                        return s + "es";
+                    } else if (endsWithAny(
+                                   s, {"sch", "st", "zt"})) { // Mostly true
+                        return s + "es";
+                    } /*else if (dict.isAdjective(s) ||
+                               dict.isVerb(s)) { // Singen, Grün
+                        return s + "s";
+                    } else if() {
+                        // If there is only one syllable or the last syllable is
+                        // pronounced it is not important if you use -s or -es
+                        return {s + "s", s + "es"};
+                    } */
+                    else {
+                        return s + "s";
+                    }
+                }
+            } else if (true || f) {
+                return s;
+            }
+            break;
+        case NounType::Numeral:
+            return s;
+            break;
+        }
+    }
+
+    string gp(const Dictionary &dict,
+              const bool forceArtificial = false) const {
+        if (noPlural)
+            return "";
+        if (forceArtificial || genitive.plural.empty())
+            return np(dict, false);
+        return genitive.plural[0];
+    }
+
+    bool gp(const Dictionary &dict, string test) const {
+        if (noPlural)
+            return false;
+        test = toLower(test);
+        for (auto g : genitive.plural) {
+            if (toLower(g) == test)
+                return true;
+        }
+        if (genitive.plural.empty()) {
+            return np(dict, test);
+        }
+        return false;
+    }
+
+    string ds(const bool forceArtificial = false) const {
+        if (noSingular)
+            return "";
+        if (forceArtificial || dative.singular.empty()) {
+            const string ns = this->ns();
+            const bool m = genus.empty() || genus.m;
+            if (m && endsWithAny(ns, nDeclSuffix)) {
+                return ns + "en";
+            } else if (endsWithAny(ns,
+                                   {"er", "ar", "är", "eur", "ier", "or"})) {
+                return ns;
+            }
+            if (isNDeclination()) {
+                if (endsWith(ns,
+                             "e")) { // missing: Bauer, Herr, Nachbar, Ungar...
+                    return ns + "n";
+                } else if (!endsWithAny(ns, vocals) && !endsWith(ns, "n")) {
+                    return ns + "en";
+                }
+            }
+            return ns;
+        }
+        return dative.singular[0];
+    }
+
+    bool ds(string test) const {
+        test = toLower(test);
+        if (noSingular)
+            return "";
+        for (auto g : dative.singular) {
+            if (toLower(g) == test)
+                return true;
+        }
+        if (dative.singular.empty()) {
+            return ds() == test;
+        }
+        return false;
+    }
+
+    string dp(const Dictionary &dict,
+              const bool forceArtificial = false) const {
+        if (noPlural)
+            return "";
+        if (forceArtificial || dative.plural.empty()) {
+            const string np = this->np(dict, false);
+            if (endsWithAny(np, {"e", "er", "el", "erl"}) &&
+                !endsWithAny(np, {"ae"}))
+                return np + "n";
+            return np;
+        }
+        return dative.plural[0];
+    }
+
+    bool dp(const Dictionary &dict, string test) const {
+        if (noPlural)
+            return false;
+        test = toLower(test);
+        for (auto g : dative.plural) {
+            if (toLower(g) == test)
+                return true;
+        }
+        if (dative.plural.empty()) {
+            const string np = this->np(dict);
+            if (endsWithAny(np, {"e", "er", "el", "erl"}) &&
+                !endsWithAny(np, {"ae"})) {
+                if (!tryEatB(test, "n"))
+                    return false;
+            }
+            return this->np(dict, test);
+        }
+        return false;
+    }
+
+    string as(const bool forceArtificial = false) const {
+        if (noSingular)
+            return "";
+        if (forceArtificial || accusative.singular.empty()) {
+            return ds();
+        }
+        return accusative.singular[0];
+    }
+
+    bool as(string test) const {
+        test = toLower(test);
+        if (noSingular)
+            return "";
+        for (auto g : accusative.singular) {
+            if (toLower(g) == test)
+                return true;
+        }
+        if (accusative.singular.empty()) {
+            return as() == test;
+        }
+        return false;
+    }
+
+    string ap(const Dictionary &dict,
+              const bool forceArtificial = false) const {
+        if (noPlural)
+            return "";
+        if (forceArtificial || accusative.plural.empty())
+            return np(dict, false);
+        return accusative.plural[0];
+    }
+
+    bool ap(const Dictionary &dict, string test) const {
+        if (noPlural)
+            return false;
+        test = toLower(test);
+        for (auto g : accusative.plural) {
+            if (toLower(g) == test)
+                return true;
+        }
+        if (accusative.plural.empty()) {
+            return np(dict, test);
+        }
+        return false;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    bool isNDeclination(bool forceArtificial = false) const {
+
+        const bool f = genus.empty() || genus.f;
+        const bool n = genus.empty() || genus.n;
+        if (f)
+            return false;
+        if (n)
+            return ns() == "Herz";
+
+        if (endsWith(ns(), "en")) // TODO: overthink this.
+            return false;
+
+        if (!forceArtificial) {
+            bool allOk = true;
+            for (size_t i = 0; i < 4; i++)
+                if (cases[i].singular.empty() || cases[i].plural.empty())
+                    allOk = false;
+            if (allOk) {
+                allOk = true;
+                for (size_t i = 0; i < 4; i++) {
+                    bool nConform = false;
+                    for (auto g : cases[i].singular) {
+                        nConform |= endsWith(g, "n");
+                        if (i == size_t(Cases::Genitive))
+                            nConform |= endsWith(g, "ns");
+                    }
+                    if (!nConform) {
+                        allOk = false;
+                        break;
+                    }
+                    nConform = false;
+                    for (auto g : cases[i].plural)
+                        nConform |= endsWith(g, "n");
+                    if (!nConform) {
+                        allOk = false;
+                        break;
+                    }
+                }
+                return allOk;
+            }
+        }
+
+        {
+            // Mostly humans and animals,
+            // but also Friede, Name, Buchstabe, Herz...
+            const bool m = genus.empty() || genus.m;
+            const string ns = this->ns();
+            if (m && endsWith(ns, "e") && !endsWithAny(ns, {"ie"}))
+                return true;
+            if (m && endsWithAny(ns, nDeclSuffix))
+                return true;
+        }
+        return false;
+    }
+
+    bool nullArticle() const {
+        // TODO
+        return false;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    string get(const Cases &c, bool plural, const Dictionary &dict,
+               bool fa = false) const {
+        switch (c) {
+        case Cases::Nominative:
+            return !plural ? ns() : np(dict, fa);
+            break;
+        case Cases::Genitive:
+            return !plural ? gs(dict, fa) : gp(dict, fa);
+            break;
+        case Cases::Dative:
+            return !plural ? ds(fa) : dp(dict, fa);
+            break;
+        case Cases::Accusative:
+            return !plural ? as(fa) : ap(dict, fa);
+            break;
+        }
+    }
+
+    bool test(const Cases &c, bool plural, const Dictionary &dict,
+              const string &t) const {
+        switch (c) {
+        case Cases::Nominative:
+            return !plural ? ns(t) : np(dict, t);
+            break;
+        case Cases::Genitive:
+            return !plural ? gs(dict, t) : gp(dict, t);
+            break;
+        case Cases::Dative:
+            return !plural ? ds(t) : dp(dict, t);
+            break;
+        case Cases::Accusative:
+            return !plural ? as(t) : ap(dict, t);
+            break;
+        }
+    }
+
+    bool prefined(const Cases &c, bool plural) {
+        if (plural)
+            return !cases[size_t(c)].plural.empty() &&
+                   !cases[size_t(c)].plural[0].empty();
+        else
+            return !cases[size_t(c)].singular.empty() &&
+                   !cases[size_t(c)].singular[0].empty();
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+
     void serialize(ostream &out) const {
-        nominative.serialize(out);
-        genitive.serialize(out << " ");
-        dative.serialize(out << " ");
-        accusative.serialize(out << " ");
+        for (size_t i = 0; i < 4; i++)
+            cases[i].serialize(out << " ");
         out << " " << genus.m << " " << genus.n << " " << genus.f << " "
-            << (int)type << " ";
+            << noSingular << " " << noPlural << " " << (int)type << " ";
     }
     void deserialize(istream &in) {
-        nominative.deserialize(in);
-        genitive.deserialize(in);
-        dative.deserialize(in);
-        accusative.deserialize(in);
+        for (size_t i = 0; i < 4; i++)
+            cases[i].deserialize(in);
         int temp;
-        in >> genus.m >> genus.n >> genus.f >> temp;
+        in >> genus.m >> genus.n >> genus.f >> noSingular >> noPlural >> temp;
         type = (NounType)temp;
     }
     void buildMap(map<string, vector<Word>> &dict) const {
@@ -647,7 +1030,7 @@ bool isKStem(const string &str,
             if (w.noun->type == NounType::Noun) {
                 if (w.noun->ns(str)) {
                     return true;
-                } else if (w.noun->np(str)) {
+                } else if (w.noun->np(dict, str)) {
                     return true;
                 }
             }
@@ -699,7 +1082,7 @@ vector<string> breakKompositum(const string &word, const Dictionary &dict) {
             }
 
             // Fugenelement (there are also others, but I don't really care -
-            // see https://de.wikipedia.org/wiki/Komposition_(Grammatik))
+            // see https://de.wikipedia.org/wiki/Komposition_(Grammatik) )
             else if (word[i] == 's' &&
                      !isAnyOf(string("") + word[i - 1], vocals) &&
                      !isAnyOf(string("") + word[i + 1], vocals)) {
@@ -720,24 +1103,26 @@ vector<string> breakKompositum(const string &word, const Dictionary &dict) {
 }
 
 string Noun::np(const Dictionary &dict, bool forceArtificial) const {
+    if (noPlural)
+        return "";
     if (forceArtificial || nominative.plural.empty()) {
         string s = ns();
 
         vector<string> v = breakKompositum(s, dict);
         if (v.size() <= 1)
-            return np(forceArtificial);
+            return npWithoutDict(forceArtificial);
         const string head = v[v.size() - 1];
         string headPl;
         for (Word w : dict.find(head)) {
             if (w.w == WordType::Noun) {
                 if (w.noun->ns(head)) {
-                    headPl = toLower(w.noun->np(forceArtificial));
+                    headPl = toLower(w.noun->npWithoutDict(forceArtificial));
                     break;
                 }
             }
         }
         if (headPl.empty())
-            return np(forceArtificial);
+            return npWithoutDict(forceArtificial);
 
         v.pop_back();
         string res;
@@ -749,6 +1134,8 @@ string Noun::np(const Dictionary &dict, bool forceArtificial) const {
 }
 
 string Noun::ns() const {
+    if (noSingular)
+        return "";
     if (nominative.singular.empty()) {
         if (nominative.plural.empty()) {
             cout << endl << "Error: nominative!" << endl;
