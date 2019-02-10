@@ -1,87 +1,29 @@
 #pragma once
 
-#include <algorithm>
-#include <cctype>
-#include <iostream>
 #include <ostream>
 #include <string>
 #include <vector>
 using std::ostream, std::wostream;
-using std::string, std::wstring;
+using std::string, std::wstring, std::to_string;
 using std::vector;
-
-#include "utf8.h"
-
-#include <unicode/locid.h>
-#include <unicode/unistr.h>
-#include <unicode/ustream.h>
 
 //#include <customOperator.h>
 
-std::wstring widen(string s) {
-    try {
-        std::wstring wide_out;
-        utf8::utf8to16(s.begin(), s.end(), back_inserter(wide_out));
-        return wide_out;
-    } catch (...) {
-        cout << endl << "Error widen: " << s << endl;
-    }
+std::wstring widen(string s);
 
-    return L"";
-}
+void fixUTF8(std::string &str);
 
-void fixUTF8(std::string &str) {
-    try {
-        str += " "; // To avoid not_enough_room
-        std::string temp;
-        utf8::replace_invalid(str.begin(), str.end(), back_inserter(temp));
-        str = temp;
-    } catch (... /*utf8::not_enough_room &e*/) {
-        cout << endl << "Error sani: " << endl << str << endl;
-    }
-}
-
-namespace TColors {
-const char *darkBlue = "\033[34m";
-const char *red = "\033[31m";
-const char *green = "\033[32m";
-const char *yellow = "\033[33m";
-const char *black = "\033[0m";
-const char *greenblue = "\033[36m";
-const char *purple = "\033[35m";
-const char *grey = "\033[30m";
-} // namespace TColors
 
 enum Color { blue, red, green, yellow, black, greenblue, purple, grey };
 
-const char *colorToString(const Color color) {
-    switch (color) {
-    case blue:
-        return TColors::darkBlue;
-    case red:
-        return TColors::red;
-    case green:
-        return TColors::green;
-    case yellow:
-        return TColors::yellow;
-    case black:
-        return TColors::black;
-    case greenblue:
-        return TColors::greenblue;
-    case purple:
-        return TColors::purple;
-    case grey:
-        return TColors::grey;
-    }
-    return "";
-}
+const char *colorToString(const Color color);
 
-ostream &operator<<(ostream &out, const Color color) {
+static inline ostream &operator<<(ostream &out, const Color color) {
     out << colorToString(color);
     return out;
 }
 
-wostream &operator<<(wostream &out, const Color color) {
+static inline wostream &operator<<(wostream &out, const Color color) {
     out << widen(colorToString(color));
     return out;
 }
@@ -98,7 +40,7 @@ class Exception {
 /**
  * Returns the number of bytes the given character should have
  */
-inline int codePoint(const char &c) {
+static inline int codePoint(const char &c) {
     if ((c & 0xf8) == 0xf0)
         return 4;
     else if ((c & 0xf0) == 0xe0)
@@ -108,23 +50,23 @@ inline int codePoint(const char &c) {
     return 1;
 }
 
-template <typename T, typename K> bool has(const T &t, const K &k) {
+template <typename T, typename K> inline bool has(const T &t, const K &k) {
     return std::find(t.begin(), t.end(), k) != t.end();
 }
 
-template <> bool has(const string &t, const string &k) {
+template <> inline bool has(const string &t, const string &k) {
     return t.find(k) != string::npos;
 }
 
-bool has(const string &t, const char *k) { return has(t, string(k)); }
+static inline bool has(const string &t, const char *k) { return has(t, string(k)); }
 
-inline bool only(const vector<string> &vec, const string &comp) {
+static inline bool only(const vector<string> &vec, const string &comp) {
     if (vec.size() != 1)
         return false;
     return vec[0] == comp;
 }
 
-inline string removeSub(const string &in, const string &what) {
+static inline string removeSub(const string &in, const string &what) {
     string cp(in);
     size_t pos = std::string::npos;
     while ((pos = cp.find(what)) != std::string::npos)
@@ -132,24 +74,24 @@ inline string removeSub(const string &in, const string &what) {
     return cp;
 }
 
-inline bool startsWith(const string &who, const string &prefix) {
+static inline bool startsWith(const string &who, const string &prefix) {
     return !who.compare(0, prefix.size(), prefix);
 }
 
-inline bool endsWith(const string &who, const string &suffix) {
+static inline bool endsWith(const string &who, const string &suffix) {
     if (suffix.size() > who.size())
         return false;
     return std::equal(suffix.rbegin(), suffix.rend(), who.rbegin());
 }
 
-bool tryEat(string &t, const string &prefix) {
+static inline bool tryEat(string &t, const string &prefix) {
     if (startsWith(t, prefix)) {
         t = t.substr(prefix.length());
         return true;
     }
     return false;
 }
-bool tryEatB(string &t, const string &suffix) {
+static inline bool tryEatB(string &t, const string &suffix) {
     if (endsWith(t, suffix)) {
         t = t.substr(0, t.length() - suffix.length());
         return true;
@@ -158,19 +100,10 @@ bool tryEatB(string &t, const string &suffix) {
 }
 
 // trim from start (in place)
-static inline void ltrim(std::string &s) {
-    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
-                return !std::isspace(ch);
-            }));
-}
+void ltrim(std::string &s);
 
 // trim from end (in place)
-static inline void rtrim(string &s) {
-    s.erase(std::find_if(s.rbegin(), s.rend(),
-                         [](unsigned char ch) { return !std::isspace(ch); })
-                .base(),
-            s.end());
-}
+void rtrim(string &s);
 
 // trim from both ends (in place)
 static inline void trimHere(string &s) {
@@ -186,7 +119,7 @@ static inline string trim(const string &s) {
 }
 
 template <typename K, typename T, typename F>
-vector<K> vecMap(const vector<T> &vec, F f) {
+static inline vector<K> vecMap(const vector<T> &vec, F f) {
     vector<K> out;
     out.resize(vec.size());
     for (size_t i = 0; i < vec.size(); i++)
@@ -194,35 +127,35 @@ vector<K> vecMap(const vector<T> &vec, F f) {
     return out;
 }
 
-bool isAnyOf(const string &x, const vector<string> &of) {
+static inline bool isAnyOf(const string &x, const vector<string> &of) {
     for (auto o : of)
         if (o == x)
             return true;
     return false;
 }
 
-bool hasAnyOf(const string &x, const vector<string> &of) {
+static inline bool hasAnyOf(const string &x, const vector<string> &of) {
     for (auto o : of)
         if (has(x, o))
             return true;
     return false;
 }
 
-inline bool endsWithAny(const string &who, const vector<string> &of) {
+static inline bool endsWithAny(const string &who, const vector<string> &of) {
     for (auto o : of)
         if (endsWith(who, o))
             return true;
     return false;
 }
 
-inline bool startsWithAny(const string &who, const vector<string> &of) {
+static inline bool startsWithAny(const string &who, const vector<string> &of) {
     for (auto o : of)
         if (startsWith(who, o))
             return true;
     return false;
 }
 
-inline void replaceHere(string &str, const string &what, const string &with) {
+static inline void replaceHere(string &str, const string &what, const string &with) {
     if (what.empty())
         return;
     size_t start_pos = 0;
@@ -232,7 +165,7 @@ inline void replaceHere(string &str, const string &what, const string &with) {
     }
 }
 
-inline string umlautify(string in) {
+static inline string umlautify(string in) {
     replaceHere(in, "a", "ä");
     replaceHere(in, "A", "Ä");
     replaceHere(in, "u", "ü");
@@ -246,7 +179,7 @@ inline string umlautify(string in) {
     return in;
 }
 
-inline size_t count(const string &who, const vector<char> &infix) {
+static inline size_t count(const string &who, const vector<char> &infix) {
     size_t c = 0;
     for (auto i : infix) {
         c += std::count(who.begin(), who.end(), i);
@@ -254,7 +187,7 @@ inline size_t count(const string &who, const vector<char> &infix) {
     return c;
 }
 
-inline size_t count(const string &who, const vector<string> &infix) {
+static inline size_t count(const string &who, const vector<string> &infix) {
     size_t c = 0;
     for (auto i : infix) {
         size_t nPos = 0;
@@ -268,7 +201,7 @@ inline size_t count(const string &who, const vector<string> &infix) {
 
 // Counts all occurrences but every char in the string can only be used once to
 // match any infix
-inline size_t countInOrder(const string &who, const vector<string> &infix) {
+static inline size_t countInOrder(const string &who, const vector<string> &infix) {
     size_t c = 0;
     for (size_t i = 0; i < who.size(); i++) {
         for (auto inf : infix) {
@@ -291,14 +224,6 @@ class LOCALE {
   public:
     LOCALE() { std::setlocale(LC_ALL, "de_DE.UTF-8"); }
 };
-const thread_local LOCALE _LOCALE;
+const extern thread_local LOCALE _LOCALE;
 
-string toLower(const string &s) {
-    // for (size_t i = 0; i < s.size(); i++) s[i] = std::tolower(s[i]);
-    // std::transform(s.begin(), s.end(), s.begin(), ::tolower);
-
-    icu::UnicodeString str(s.c_str(), "UTF-8");
-    string target;
-    str.toLower("de_DE").toUTF8String(target);
-    return target;
-}
+string toLower(const string &s);

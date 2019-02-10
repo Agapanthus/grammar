@@ -1,6 +1,3 @@
-
-#include <algorithm>
-#include <cstdlib>
 #include <fstream>
 #include <ios>
 #include <iostream>
@@ -13,7 +10,8 @@ using std::string, std::vector;
 
 //#include "find.hpp"
 #include "filters.hpp"
-#include "grammar.hpp"
+#include "dictionary.hpp"
+#include "kompositum.hpp"
 #include "grammarIO.hpp"
 #include "parseWiki.hpp"
 #include "punctuation.hpp"
@@ -197,6 +195,8 @@ int main(int argc, char **argv) {
     // TODO: nuspell verwenden, um Zusammengesetzte Wörter zu zerkleinern!
 
     // TODO: Lower String als Typ einführen um Fehler zu reduzieren!
+
+    // TODO: Komposita spalten, wenn andere Kasi berechnet werden!
 
     try {
 

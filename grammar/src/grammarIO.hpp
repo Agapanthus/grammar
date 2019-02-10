@@ -8,7 +8,7 @@ using std::string, std::to_string;
 
 #include "grammar.hpp"
 
-ostream &operator<<(ostream &out, const NounType &n) {
+static inline ostream &operator<<(ostream &out, const NounType &n) {
     switch (n) {
     case NounType::Name:
         out << "Name";
@@ -28,7 +28,7 @@ ostream &operator<<(ostream &out, const NounType &n) {
     }
     return out;
 }
-ostream &operator<<(ostream &out, const pronounType &n) {
+static inline ostream &operator<<(ostream &out, const pronounType &n) {
     switch (n) {
     case pronounType::Personal:
         out << "Personal";
@@ -60,7 +60,7 @@ ostream &operator<<(ostream &out, const pronounType &n) {
     }
     return out;
 }
-ostream &operator<<(ostream &out, const Numeri &n) {
+static inline ostream &operator<<(ostream &out, const Numeri &n) {
     if (n.singular.size() > 0)
         out << " ";
     for (const string s : n.singular)
@@ -72,13 +72,13 @@ ostream &operator<<(ostream &out, const Numeri &n) {
     return out;
 }
 
-ostream &operator<<(ostream &out, const Person &p) {
+static inline ostream &operator<<(ostream &out, const Person &p) {
     out << "\n   1. " << p.first << "\n   2. " << p.second << "\n   3. "
         << p.third << "\n";
     return out;
 }
 
-ostream &operator<<(ostream &out, const Genus &n) {
+static inline ostream &operator<<(ostream &out, const Genus &n) {
     if (n.m)
         out << "m";
     if (n.f)
@@ -88,7 +88,7 @@ ostream &operator<<(ostream &out, const Genus &n) {
     return out;
 }
 
-ostream &operator<<(ostream &out, const Noun &n) {
+static inline ostream &operator<<(ostream &out, const Noun &n) {
     out << n.type << " " << n.genus << "\n";
     static const thread_local vector<string> casesStr = {"NOM", "GEN", "DAT",
                                                          "ACC"};
@@ -105,7 +105,7 @@ void printVector(ostream &out, const vector<T> &t, const string &sep = " ") {
         out << tt << sep;
 }
 
-ostream &operator<<(ostream &out, const Verb &v) {
+static inline ostream &operator<<(ostream &out, const Verb &v) {
     if (!v.base.present.empty())
         out << v.base.present << " ";
 
@@ -123,25 +123,25 @@ ostream &operator<<(ostream &out, const Verb &v) {
     return out;
 }
 
-ostream &operator<<(ostream &out, const Adjective &a) {
+static inline ostream &operator<<(ostream &out, const Adjective &a) {
     printVector(out, a.positive);
     printVector(out, a.comparative);
     printVector(out, a.superlative);
     return out;
 }
-ostream &operator<<(ostream &out, const Adverb &a) {
+static inline ostream &operator<<(ostream &out, const Adverb &a) {
     printVector(out, a.positive);
     printVector(out, a.comparative);
     printVector(out, a.superlative);
     return out;
 }
 
-ostream &operator<<(ostream &out, const Pronoun &p) {
+static inline ostream &operator<<(ostream &out, const Pronoun &p) {
     out << p.type << p.nominative << p.genitive << p.dative << p.accusative;
     return out;
 }
 
-ostream &operator<<(ostream &out, const Word &w) {
+static inline ostream &operator<<(ostream &out, const Word &w) {
     switch (w.w) {
     case WordType::Adjective:
         out << *w.adj;
@@ -169,13 +169,13 @@ ostream &operator<<(ostream &out, const Word &w) {
     return out;
 }
 
-ostream &operator<<(ostream &out, const vector<Word> &words) {
+static inline ostream &operator<<(ostream &out, const vector<Word> &words) {
     for (auto w : words)
         out << w << "\n";
     return out;
 }
 
-ostream &operator<<(ostream &out, const Dictionary &dict) {
+static inline ostream &operator<<(ostream &out, const Dictionary &dict) {
     const bool printList = false;
 
     out << "\n"
