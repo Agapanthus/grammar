@@ -10,29 +10,23 @@ enum class pronounType {
     Indefinite,
     Relative,
     Interrogative,
+    Article,
     unknown
 };
 
-struct Pronoun {
+struct Pronoun : public WithCases {
     pronounType type;
-    Person nominative, genitive, dative, accusative;
 
     void serialize(ostream &out) const {
         out << (int)type << " ";
-        nominative.serialize(out);
-        genitive.serialize(out);
-        dative.serialize(out);
-        accusative.serialize(out);
+        WithCases::serialize(out);
     }
 
     void deserialize(istream &in) {
         int iType;
         in >> iType;
         type = (pronounType)iType;
-        nominative.deserialize(in);
-        genitive.deserialize(in);
-        dative.deserialize(in);
-        accusative.deserialize(in);
+        WithCases::deserialize(in);
     }
 
     void buildMap(map<string, vector<Word>> &dict) {

@@ -1,16 +1,15 @@
 #pragma once
-#include "noun.hpp"
-#include "verb.hpp"
 #include "adjective.hpp"
 #include "adverb.hpp"
+#include "noun.hpp"
 #include "pronoun.hpp"
+#include "verb.hpp"
 
 /*
 struct Diathesis {
     Person active, processualPassive,
         statalPassive; // TODO: , causative, applicative;
 };*/
-
 
 class Dictionary {
   private:
@@ -50,15 +49,15 @@ class Dictionary {
             pro.buildMap(dict);
     }
 
-    vector<Word> find(const string &what) const {
-        auto res = dict.find(toLower(what));
+    vector<Word> find(const stringLower &what) const {
+        auto res = dict.find(what);
         if (res == dict.end())
             return {};
         return res->second;
     }
 
-    vector<Word> closest(const string &what) const {
-        auto low = dict.lower_bound(toLower(what));
+    vector<Word> closest(const stringLower &what) const {
+        auto low = dict.lower_bound(what);
         if (low == dict.end())
             return {};
         else if (low == dict.begin())
@@ -66,10 +65,61 @@ class Dictionary {
         else {
             auto prev = std::prev(low);
             vector<Word> res = prev->second;
-            for (auto w : low->second)
+            for (const auto &w : low->second)
                 res.push_back(w);
             return res;
         }
+    }
+
+  private:
+    static size_t stripEmpty(WithCases &wc) {
+        size_t stripped = 0;
+        for (size_t i = 0; i < 4; i++) {
+            stripped += removeWhere(wc.cases[i].singular, "") +
+                        removeWhere(wc.cases[i].plural, "");
+        }
+        return stripped;
+    }
+    static size_t stripEmpty(Person &p) {
+        return stripEmpty(p.first) + stripEmpty(p.second) + stripEmpty(p.third);
+    }
+    static size_t stripEmpty(Numeri &n) {
+        return removeWhere(n.singular, "") + removeWhere(n.plural, "");
+    }
+
+  public:
+    void simplify() {
+        size_t emptyRemoved = 0;
+        for (Noun &noun : nouns)
+            emptyRemoved += stripEmpty(noun);
+        for (Adjective &adj : adjectives) {
+            for (size_t i = 0; i < 9; i++)
+                emptyRemoved += stripEmpty(adj.cases[i]);
+            emptyRemoved += removeWhere(adj.positive, "") +
+                            removeWhere(adj.comparative, "") +
+                            removeWhere(adj.superlative, "");
+        }
+        for (Verb &verb : verbs) {
+            emptyRemoved +=
+                stripEmpty(verb.imperative) + stripEmpty(verb.base.present) +
+                removeWhere(verb.base.auxiliary, "") +
+                removeWhere(verb.base.irrealis_firstSingular, "") +
+                removeWhere(verb.base.participleII, "") +
+                removeWhere(verb.base.presentInfinitive, "") +
+                removeWhere(verb.base.preterite_firstSingular, "") +
+                removeWhere(verb.base.subjunctive_firstSingular, "");
+        }
+        for (Adverb &adv : adverbs) {
+            emptyRemoved += removeWhere(adv.positive, "") +
+                            removeWhere(adv.comparative, "") +
+                            removeWhere(adv.superlative, "");
+        }
+        for (Pronoun &pro : pronouns)
+            emptyRemoved += stripEmpty(pro);
+
+        cout << "   removed empty: " << emptyRemoved << endl;
+
+        
     }
 
     void serialize(ostream &out) const {

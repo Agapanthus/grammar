@@ -16,11 +16,12 @@ string Noun::np(const Dictionary &dict, bool forceArtificial) const {
         if (v.size() <= 1)
             return npWithoutDict(forceArtificial);
         const string head = v[v.size() - 1];
-        string headPl;
-        for (Word w : dict.find(head)) {
+        stringLower headPl;
+        for (const Word &w : dict.find(head)) {
             if (w.w == WordType::Noun) {
                 if (w.noun->ns(head)) {
-                    headPl = toLower(w.noun->npWithoutDict(forceArtificial));
+                    headPl =
+                        stringLower(w.noun->npWithoutDict(forceArtificial));
                     break;
                 }
             }
@@ -30,7 +31,7 @@ string Noun::np(const Dictionary &dict, bool forceArtificial) const {
 
         v.pop_back();
         string res;
-        for (auto vv : v)
+        for (const auto &vv : v)
             res += vv;
         return res + headPl;
     }
@@ -47,7 +48,8 @@ string Noun::ns() const {
             throw Exception("nominative needed!");
         } else {
             cout << endl
-                 << "Error: Singular doesn't exist! " << nominative.plural[0]
+                 << "Error: Singular doesn't exist! "
+                 << (nominative.plural.empty() ? "" : nominative.plural[0])
                  << endl;
             return "";
         }
@@ -178,7 +180,7 @@ string Noun::npRules(const bool forceArtificial) const {
     ///////////////////////////////////// Advanced Rules
 
     if ((m || n) && endsWithAny(s, {"el", "er", "en"})) { // 90% TODO: unbetont
-        /*if (countInOrder(toLower(s), vocalsPlus) <=
+        /*if (countInOrder(stringLower(s), vocalsPlus) <=
             2) { // one syllable without the ending
             return umlautify(s);
         }*/
@@ -202,7 +204,7 @@ string Noun::npRules(const bool forceArtificial) const {
     ///////////////////////////////////// Basic Rules
 
     if (m) { // 90% (nicht: Mensch...)
-        if (countInOrder(toLower(s), vocalsPlus) <= 1) { // one syllable
+        if (countInOrder(stringLower(s), vocalsPlus) <= 1) { // one syllable
             return umlautify(s) + "e";
         } else
             return s + "e";
@@ -276,6 +278,7 @@ string Noun::gsRules(const bool forceArtificial) const {
             return s;
         }
         break;
+    default:
     case NounType::Numeral:
         return s;
         break;
@@ -303,7 +306,7 @@ bool Noun::isNDeclination(bool forceArtificial) const {
             allOk = true;
             for (size_t i = 0; i < 4; i++) {
                 bool nConform = false;
-                for (auto g : cases[i].singular) {
+                for (const auto &g : cases[i].singular) {
                     nConform |= endsWith(g, "n");
                     if (i == size_t(Cases::Genitive))
                         nConform |= endsWith(g, "ns");
@@ -313,7 +316,7 @@ bool Noun::isNDeclination(bool forceArtificial) const {
                     break;
                 }
                 nConform = false;
-                for (auto g : cases[i].plural)
+                for (const auto &g : cases[i].plural)
                     nConform |= endsWith(g, "n");
                 if (!nConform) {
                     allOk = false;

@@ -1,7 +1,7 @@
 #include "kompositum.hpp"
 #include "dictionary.hpp"
 
-bool isKStem(const string &str,
+bool isKStem(const stringLower &str,
              const Dictionary &dict) { // TODO: not very robust, isn't it?
     vector<Word> words = dict.find(str);
     for (const Word w : words) {
@@ -17,9 +17,9 @@ bool isKStem(const string &str,
             break;
 
         case WordType::Adjective:
-            if (!w.adj->positive.empty())
-                for (string pos : w.adj->positive)
-                    if (toLower(pos) == toLower(str))
+            if (!w.adj->positive.empty()) // TODO: Also consider stems
+                for (const stringLower pos : w.adj->positive)
+                    if (pos == str)
                         return true;
             break;
 

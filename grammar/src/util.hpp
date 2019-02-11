@@ -13,7 +13,6 @@ std::wstring widen(string s);
 
 void fixUTF8(std::string &str);
 
-
 enum Color { blue, red, green, yellow, black, greenblue, purple, grey };
 
 const char *colorToString(const Color color);
@@ -58,7 +57,9 @@ template <> inline bool has(const string &t, const string &k) {
     return t.find(k) != string::npos;
 }
 
-static inline bool has(const string &t, const char *k) { return has(t, string(k)); }
+static inline bool has(const string &t, const char *k) {
+    return has(t, string(k));
+}
 
 static inline bool only(const vector<string> &vec, const string &comp) {
     if (vec.size() != 1)
@@ -127,35 +128,72 @@ static inline vector<K> vecMap(const vector<T> &vec, F f) {
     return out;
 }
 
-static inline bool isAnyOf(const string &x, const vector<string> &of) {
-    for (auto o : of)
+inline size_t removeWhere(vector<string> &of, const string &x) {
+    size_t removed = 0;
+    std::vector<std::string>::iterator i = of.begin();
+    while (i != of.end()) {
+        if (*i == x) {
+            removed++;
+            i = of.erase(i);
+        } else
+            ++i;
+    }
+    return removed;
+}
+
+template <typename T>
+inline bool isAnyOf(const T &x, const vector<string> &of) {
+    for (const auto &o : of)
         if (o == x)
             return true;
     return false;
 }
 
+/*static inline vector<string> &concatMove(vector<string> &a,
+                                         const vector<string> &b) {
+    a.insert(a.end(), std::make_move_iterator(b.begin()),
+             std::make_move_iterator(b.end()));
+    return a;
+}*/
+
+static inline void pushUnique(vector<string> &a, const vector<string> &b) {
+    for (const auto &bb : b)
+        if (!has(a, bb))
+            a.push_back(bb);
+}
+
 static inline bool hasAnyOf(const string &x, const vector<string> &of) {
-    for (auto o : of)
+    for (const auto &o : of)
         if (has(x, o))
             return true;
     return false;
 }
 
+static inline bool doIntersect(const vector<string> &a,
+                               const vector<string> &b) {
+    for (const auto &aa : a) {
+        if (isAnyOf(aa, b))
+            return true;
+    }
+    return false;
+}
+
 static inline bool endsWithAny(const string &who, const vector<string> &of) {
-    for (auto o : of)
+    for (const auto &o : of)
         if (endsWith(who, o))
             return true;
     return false;
 }
 
 static inline bool startsWithAny(const string &who, const vector<string> &of) {
-    for (auto o : of)
+    for (const auto &o : of)
         if (startsWith(who, o))
             return true;
     return false;
 }
 
-static inline void replaceHere(string &str, const string &what, const string &with) {
+static inline void replaceHere(string &str, const string &what,
+                               const string &with) {
     if (what.empty())
         return;
     size_t start_pos = 0;
@@ -181,7 +219,7 @@ static inline string umlautify(string in) {
 
 static inline size_t count(const string &who, const vector<char> &infix) {
     size_t c = 0;
-    for (auto i : infix) {
+    for (const auto &i : infix) {
         c += std::count(who.begin(), who.end(), i);
     }
     return c;
@@ -189,7 +227,7 @@ static inline size_t count(const string &who, const vector<char> &infix) {
 
 static inline size_t count(const string &who, const vector<string> &infix) {
     size_t c = 0;
-    for (auto i : infix) {
+    for (const auto &i : infix) {
         size_t nPos = 0;
         while ((nPos = who.find(i, nPos)) != string::npos) {
             c++;
@@ -201,10 +239,11 @@ static inline size_t count(const string &who, const vector<string> &infix) {
 
 // Counts all occurrences but every char in the string can only be used once to
 // match any infix
-static inline size_t countInOrder(const string &who, const vector<string> &infix) {
+static inline size_t countInOrder(const string &who,
+                                  const vector<string> &infix) {
     size_t c = 0;
     for (size_t i = 0; i < who.size(); i++) {
-        for (auto inf : infix) {
+        for (const auto &inf : infix) {
             if (inf.size() <= who.size() - i) {
                 if (who.substr(i, inf.size()) == inf) {
                     c++;
@@ -218,12 +257,24 @@ static inline size_t countInOrder(const string &who, const vector<string> &infix
     return c;
 }
 
-#include <clocale>
-
-class LOCALE {
-  public:
-    LOCALE() { std::setlocale(LC_ALL, "de_DE.UTF-8"); }
-};
-const extern thread_local LOCALE _LOCALE;
-
 string toLower(const string &s);
+
+class stringLower : public string {
+
+  public:
+    stringLower() {}
+    stringLower(const stringLower &x) : string(x) {}
+    stringLower(const stringLower &&x) : string(x) {}
+    stringLower &operator=(const stringLower &x) {
+        string::operator=(x);
+        return *this;
+    }
+
+    stringLower(const char *x) : string(toLower(x)) {}
+    stringLower(const string &x) : string(toLower(x)) {}
+    stringLower(const string &&x) : string(toLower(x)) {}
+    stringLower &operator=(const string &x) = delete;
+
+    // conversion to string (type-cast operator)
+    // operator string() { return *this; }
+};

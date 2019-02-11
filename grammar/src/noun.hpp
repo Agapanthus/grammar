@@ -7,48 +7,32 @@ enum class NounType {
     Noun,
     Numeral,
     Toponym,
+    Incomplete,
 };
 
 const static thread_local vector<string> nDeclSuffix = {
     "and", "ant", "at",   "end", "et", "ent",  "graph", "ist",
     "ik",  "it",  "loge", "nom", "ot", "soph", "urg"};
 
-enum class Cases { Nominative = 0, Genitive = 1, Dative = 2, Accusative = 3 };
-
-struct Noun { // See http://www.dietz-und-daf.de/GD_DkfA/Gramm-List.htm
-    Numeri cases[4];
-    Numeri &nominative, &genitive, &dative, &accusative;
-
-    Genus genus;
-    NounType type;
+class Noun
+    : public WithCases { // See
+                         // http://www.dietz-und-daf.de/GD_DkfA/Gramm-List.htm
+  
+  public:
     bool noPlural, noSingular;
-    Noun()
-        : noPlural(false), noSingular(false),
-          nominative(cases[(size_t)Cases::Nominative]),
-          genitive(cases[(size_t)Cases::Genitive]),
-          dative(cases[(size_t)Cases::Dative]),
-          accusative(cases[(size_t)Cases::Accusative]) {}
+    NounType type;
+    Genus genus;
+
+    Noun() : noPlural(false), noSingular(false) {}
+
+    //////////////////////////////////////////////
 
     string ns() const;
 
     // Tests if n is a nominative singular
-    // Warning: This one is a little less robust than the test for the other
-    // cases
-    bool ns(string n) const {
-        n = toLower(n);
-        for (auto s : nominative.singular)
-            if (toLower(s) == n)
-                return true;
-        return false;
-    }
-
-    bool np(const Dictionary &dict, string n) const {
-        n = toLower(n);
-        for (auto s : nominative.plural)
-            if (toLower(s) == n)
-                return true;
-        if (nominative.plural.empty())
-            if (n == toLower(np(dict)))
+    bool ns(const stringLower &n) const {
+        for (const stringLower s : nominative.singular)
+            if (s == n)
                 return true;
         return false;
     }
@@ -62,10 +46,19 @@ struct Noun { // See http://www.dietz-und-daf.de/GD_DkfA/Gramm-List.htm
         return nominative.plural[0];
     }
 
-    // Better version using the dictionary
     string np(const Dictionary &dict, bool forceArtificial = false) const;
 
-    string npRules(const bool forceArtificial = false) const;
+    // Warning: This one is a little less robust than the test for the other
+    // cases
+    bool np(const Dictionary &dict, const stringLower &n) const {
+        for (const stringLower s : nominative.plural)
+            if (s == n)
+                return true;
+        if (nominative.plural.empty())
+            if (n == stringLower(np(dict)))
+                return true;
+        return false;
+    }
 
     string gs(const Dictionary &dict,
               const bool forceArtificial = false) const {
@@ -77,16 +70,15 @@ struct Noun { // See http://www.dietz-und-daf.de/GD_DkfA/Gramm-List.htm
     }
 
     // TODO: quite vague test
-    bool gs(const Dictionary &dict, string test) const {
+    bool gs(const Dictionary &dict, const stringLower &test) const {
         if (noSingular)
             return false;
-        test = toLower(test);
-        for (auto g : genitive.singular) {
-            if (toLower(g) == test)
+        for (const stringLower g : genitive.singular) {
+            if (g == test)
                 return true;
         }
         if (genitive.singular.empty()) {
-            const string ns = toLower(this->ns());
+            const string ns = stringLower(this->ns());
             const bool m = genus.empty() || genus.m;
             const bool f = genus.empty() || genus.f;
             const bool n = genus.empty() || genus.n;
@@ -97,7 +89,7 @@ struct Noun { // See http://www.dietz-und-daf.de/GD_DkfA/Gramm-List.htm
                 return ns + "en" == test;
             } else if ((n || m) && endsWithAny(ns, sibilants)) {
                 return ns + "es" == test;
-            } else if (test == toLower(gs(dict))) {
+            } else if (test == stringLower(gs(dict))) {
                 return true;
             } else if (ns == test || ns + "s" == test) {
                 return true;
@@ -105,8 +97,6 @@ struct Noun { // See http://www.dietz-und-daf.de/GD_DkfA/Gramm-List.htm
         }
         return false;
     }
-
-    string gsRules(const bool forceArtificial = false) const;
 
     string gp(const Dictionary &dict,
               const bool forceArtificial = false) const {
@@ -117,12 +107,11 @@ struct Noun { // See http://www.dietz-und-daf.de/GD_DkfA/Gramm-List.htm
         return genitive.plural[0];
     }
 
-    bool gp(const Dictionary &dict, string test) const {
+    bool gp(const Dictionary &dict, const stringLower &test) const {
         if (noPlural)
             return false;
-        test = toLower(test);
-        for (auto g : genitive.plural) {
-            if (toLower(g) == test)
+        for (const stringLower g : genitive.plural) {
+            if (g == test)
                 return true;
         }
         if (genitive.plural.empty()) {
@@ -156,12 +145,11 @@ struct Noun { // See http://www.dietz-und-daf.de/GD_DkfA/Gramm-List.htm
         return dative.singular[0];
     }
 
-    bool ds(string test) const {
-        test = toLower(test);
+    bool ds(const stringLower &test) const {
         if (noSingular)
             return "";
-        for (auto g : dative.singular) {
-            if (toLower(g) == test)
+        for (const stringLower g : dative.singular) {
+            if (g == test)
                 return true;
         }
         if (dative.singular.empty()) {
@@ -184,19 +172,18 @@ struct Noun { // See http://www.dietz-und-daf.de/GD_DkfA/Gramm-List.htm
         return dative.plural[0];
     }
 
-    bool dp(const Dictionary &dict, string test) const {
+    bool dp(const Dictionary &dict, const stringLower &test) const {
         if (noPlural)
             return false;
-        test = toLower(test);
-        for (auto g : dative.plural) {
-            if (toLower(g) == test)
+        for (const stringLower g : dative.plural) {
+            if (g == test)
                 return true;
         }
         if (dative.plural.empty()) {
             const string np = this->np(dict);
             if (endsWithAny(np, {"e", "er", "el", "erl"}) &&
                 !endsWithAny(np, {"ae"})) {
-                if (!tryEatB(test, "n"))
+                if (!endsWith(test, "n"))
                     return false;
             }
             return this->np(dict, test);
@@ -213,12 +200,11 @@ struct Noun { // See http://www.dietz-und-daf.de/GD_DkfA/Gramm-List.htm
         return accusative.singular[0];
     }
 
-    bool as(string test) const {
-        test = toLower(test);
+    bool as(const stringLower &test) const {
         if (noSingular)
             return "";
-        for (auto g : accusative.singular) {
-            if (toLower(g) == test)
+        for (const stringLower g : accusative.singular) {
+            if (g == test)
                 return true;
         }
         if (accusative.singular.empty()) {
@@ -236,12 +222,11 @@ struct Noun { // See http://www.dietz-und-daf.de/GD_DkfA/Gramm-List.htm
         return accusative.plural[0];
     }
 
-    bool ap(const Dictionary &dict, string test) const {
+    bool ap(const Dictionary &dict, const stringLower test) const {
         if (noPlural)
             return false;
-        test = toLower(test);
-        for (auto g : accusative.plural) {
-            if (toLower(g) == test)
+        for (const stringLower g : accusative.plural) {
+            if (g == test)
                 return true;
         }
         if (accusative.plural.empty()) {
@@ -253,6 +238,10 @@ struct Noun { // See http://www.dietz-und-daf.de/GD_DkfA/Gramm-List.htm
     ////////////////////////////////////////////////////////////////////////////
 
     bool isNDeclination(bool forceArtificial = false) const;
+
+    string npRules(const bool forceArtificial = false) const;
+
+    string gsRules(const bool forceArtificial = false) const;
 
     bool nullArticle() const {
         // TODO
@@ -297,7 +286,7 @@ struct Noun { // See http://www.dietz-und-daf.de/GD_DkfA/Gramm-List.htm
         }
     }
 
-    bool prefined(const Cases &c, bool plural) {
+    bool predefined(const Cases &c, bool plural) const {
         if (plural)
             return !cases[size_t(c)].plural.empty() &&
                    !cases[size_t(c)].plural[0].empty();
@@ -309,18 +298,19 @@ struct Noun { // See http://www.dietz-und-daf.de/GD_DkfA/Gramm-List.htm
     ////////////////////////////////////////////////////////////////////////////
 
     void serialize(ostream &out) const {
-        for (size_t i = 0; i < 4; i++)
-            cases[i].serialize(out << " ");
-        out << " " << genus.m << " " << genus.n << " " << genus.f << " "
-            << noSingular << " " << noPlural << " " << (int)type << " ";
+        WithCases::serialize(out);
+        genus.serialize(out);
+        out << noSingular << " " << noPlural << " " << (int)type << " ";
     }
+
     void deserialize(istream &in) {
-        for (size_t i = 0; i < 4; i++)
-            cases[i].deserialize(in);
+        WithCases::deserialize(in);
+        genus.deserialize(in);
         int temp;
-        in >> genus.m >> genus.n >> genus.f >> noSingular >> noPlural >> temp;
+        in >> noSingular >> noPlural >> temp;
         type = (NounType)temp;
     }
+
     void buildMap(map<string, vector<Word>> &dict) const {
         Word me({this, WordType::Noun});
         nominative.buildMap(me, dict);

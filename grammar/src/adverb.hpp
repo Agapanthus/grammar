@@ -7,7 +7,6 @@ enum class AdverbType {
     particle,
     subjunction,
     unknown,
-    article,
     conjunction,
     preposition,
     other
@@ -37,11 +36,11 @@ struct Adverb {
 
     void buildMap(map<string, vector<Word>> &dict) {
         Word me({(Noun *)this, WordType::Adverb});
-        for (auto s : positive)
+        for (const auto &s : positive)
             emplace(dict, s, me);
-        for (auto s : comparative)
+        for (const auto &s : comparative)
             emplace(dict, s, me);
-        for (auto s : superlative)
+        for (const auto &s : superlative)
             emplace(dict, s, me);
     }
 };

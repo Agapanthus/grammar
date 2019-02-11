@@ -35,7 +35,8 @@ struct Word {
     WordType w;
 };
 
-void emplace(map<string, vector<Word>> &dict, const string &s, const Word &w);
+void emplace(map<string, vector<Word>> &dict, const stringLower &s,
+             const Word &w);
 
 //////////////////////////////////////
 
@@ -54,7 +55,7 @@ inline void serializeVector(ostream &out, const vector<T> &v, bool nl = true) {
     out << v.size() << (nl ? "\n" : " ");
     if (v.size() > 1024 * 1024 * 1024)
         throw std::exception("invalid");
-    for (auto e : v) {
+    for (const auto &e : v) {
         e.serialize(out);
         out << (nl ? "\n" : " ");
     }
@@ -65,7 +66,7 @@ inline void serializeVector(ostream &out, const vector<string> &v, bool nl) {
     out << (nl ? "\n" : " ") << v.size() << " ";
     if (v.size() > 1024 * 1024 * 1024)
         throw std::exception("invalid");
-    for (auto e : v) {
+    for (const auto &e : v) {
         out << e.size() << " " << e << "";
     }
 }
@@ -114,9 +115,9 @@ struct Numeri {
     }
 
     void buildMap(const Word &me, map<string, vector<Word>> &dict) const {
-        for (auto s : singular)
+        for (const auto &s : singular)
             emplace(dict, s, me);
-        for (auto s : plural)
+        for (const auto &s : plural)
             emplace(dict, s, me);
     }
 };
@@ -129,7 +130,19 @@ struct Genus {
     Genus() : m(false), n(false), f(false) {}
 
     bool empty() const { return !(m || f || n); }
+    void serialize(ostream &out) const {
+        out << m << " " << n << " " << f << " ";
+    }
+    void deserialize(istream &in) { in >> m >> n >> f; }
 };
+
+inline bool operator<=(const Genus &lhs, const Genus &rhs) {
+    if (lhs.m == rhs.m && lhs.f == rhs.f && lhs.n == rhs.n)
+        return true;
+    if (rhs.empty())
+        return true;
+    return false;
+}
 
 struct Person {
     Numeri first, second, third;
@@ -153,5 +166,46 @@ struct Person {
         first.buildMap(me, dict);
         second.buildMap(me, dict);
         third.buildMap(me, dict);
+    }
+};
+
+enum class Cases { Nominative = 0, Genitive = 1, Dative = 2, Accusative = 3 };
+
+struct WithCases {
+  private:
+    void copy(const WithCases &cp) {
+        for (size_t i = 0; i < 4; i++)
+            cases[i] = cp.cases[i];
+    }
+
+  public:
+    WithCases()
+        : nominative(cases[(size_t)Cases::Nominative]),
+          genitive(cases[(size_t)Cases::Genitive]),
+          dative(cases[(size_t)Cases::Dative]),
+          accusative(cases[(size_t)Cases::Accusative]) {}
+
+    WithCases(const WithCases &cp) : WithCases() { copy(cp); }
+
+    WithCases &operator=(const WithCases &A) {
+        copy(A);
+        return *this;
+    }
+
+    Numeri cases[4];
+    Numeri &nominative, &genitive, &dative, &accusative;
+
+    void serialize(ostream &out) const {
+        for (size_t i = 0; i < 4; i++)
+            cases[i].serialize(out << " ");
+    }
+    void deserialize(istream &in) {
+        for (size_t i = 0; i < 4; i++)
+            cases[i].deserialize(in);
+    }
+
+    bool empty() {
+        return nominative.empty() && genitive.empty() && dative.empty() &&
+               accusative.empty();
     }
 };

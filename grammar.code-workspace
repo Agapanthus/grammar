@@ -97,6 +97,12 @@
 			"forward_list": "cpp",
 			"scoped_allocator": "cpp",
 			"resumable": "cpp"
-		}
+		},
+		"cSpell.words": [
+			"diathesis",
+			"gerundive",
+			"inflective",
+			"irrealis"
+		]
 	}
 }

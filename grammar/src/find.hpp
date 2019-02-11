@@ -93,7 +93,7 @@ template <typename CHAR_T> class My_Dictionary : public Dictionary {
     }
 
     string my_check_word(std::basic_string<CHAR_T> &s) const {
-        for (auto &we : boost::make_iterator_range(words.equal_range(s))) {
+        for (const auto &we : boost::make_iterator_range(words.equal_range(s))) {
             auto &word_flags = we.second;
             if (word_flags.contains(need_affix_flag))
                 continue;

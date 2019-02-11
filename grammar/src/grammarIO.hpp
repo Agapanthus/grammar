@@ -88,14 +88,20 @@ static inline ostream &operator<<(ostream &out, const Genus &n) {
     return out;
 }
 
-static inline ostream &operator<<(ostream &out, const Noun &n) {
-    out << n.type << " " << n.genus << "\n";
+
+static inline ostream &operator<<(ostream &out, const WithCases &n) {
     static const thread_local vector<string> casesStr = {"NOM", "GEN", "DAT",
                                                          "ACC"};
     for (size_t i = 0; i < 4; i++)
         if (!n.cases[i].empty())
             out << "   " << casesStr[i] << ": " << n.cases[i] << "\n";
 
+    return out;
+}
+
+static inline ostream &operator<<(ostream &out, const Noun &n) {
+    out << n.type << " " << n.genus << "\n";
+    out << (WithCases)n;
     return out;
 }
 
@@ -115,10 +121,10 @@ static inline ostream &operator<<(ostream &out, const Verb &v) {
         printVector(out << "PART2: ", v.base.participleII);
     if (!v.base.preterite_firstSingular.empty())
         printVector(out << "PRET: ", v.base.preterite_firstSingular);
-    if (!v.base.subjunctiveI_firstSingular.empty())
-        printVector(out << "SUB1: ", v.base.subjunctiveI_firstSingular);
-    if (!v.base.subjunctiveII_firstSingular.empty())
-        printVector(out << "SUB2: ", v.base.subjunctiveII_firstSingular);
+    if (!v.base.subjunctive_firstSingular.empty())
+        printVector(out << "SUB1: ", v.base.subjunctive_firstSingular);
+    if (!v.base.irrealis_firstSingular.empty())
+        printVector(out << "SUB2: ", v.base.irrealis_firstSingular);
 
     return out;
 }
@@ -170,7 +176,7 @@ static inline ostream &operator<<(ostream &out, const Word &w) {
 }
 
 static inline ostream &operator<<(ostream &out, const vector<Word> &words) {
-    for (auto w : words)
+    for (const auto &w : words)
         out << w << "\n";
     return out;
 }
@@ -183,7 +189,7 @@ static inline ostream &operator<<(ostream &out, const Dictionary &dict) {
         << "\n"
         << "\n";
     if (printList)
-        for (auto noun : dict.nouns)
+        for (const auto &noun : dict.nouns)
             out << noun << "\n";
 
     out << "\n"
@@ -191,7 +197,7 @@ static inline ostream &operator<<(ostream &out, const Dictionary &dict) {
         << "\n"
         << "\n";
     if (printList)
-        for (auto verb : dict.verbs)
+        for (const auto &verb : dict.verbs)
             out << verb << "\n";
 
     out << "\n"
@@ -199,7 +205,7 @@ static inline ostream &operator<<(ostream &out, const Dictionary &dict) {
         << "\n"
         << "\n";
     if (printList)
-        for (auto adj : dict.adjectives)
+        for (const auto &adj : dict.adjectives)
             out << adj << "\n";
 
     out << "\n"
@@ -207,7 +213,7 @@ static inline ostream &operator<<(ostream &out, const Dictionary &dict) {
         << "\n"
         << "\n";
     if (printList)
-        for (auto adv : dict.adverbs)
+        for (const auto &adv : dict.adverbs)
             out << adv << "\n";
 
     out << "\n"
@@ -215,7 +221,7 @@ static inline ostream &operator<<(ostream &out, const Dictionary &dict) {
         << "\n"
         << "\n";
     if (printList)
-        for (auto pron : dict.pronouns)
+        for (const auto &pron : dict.pronouns)
             out << pron << "\n";
 
     return out;

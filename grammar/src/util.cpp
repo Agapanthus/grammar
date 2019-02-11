@@ -52,6 +52,12 @@ void rtrim(string &s) {
             s.end());
 }
 
+#include <clocale>
+
+class LOCALE {
+  public:
+    LOCALE() { std::setlocale(LC_ALL, "de_DE.UTF-8"); }
+};
 
 const thread_local LOCALE _LOCALE;
 
